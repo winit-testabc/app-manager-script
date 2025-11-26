@@ -1446,6 +1446,18 @@ main_menu() {
                 create_or_update_readme
                 ;;
             3)
+                show_current_config
+                echo ""
+                print_question "Press Enter to continue..."
+                read_input DUMMY
+                ;;
+            4)
+                write_deploy_script
+                echo ""
+                print_question "Press Enter to continue..."
+                read_input DUMMY
+                ;;
+            5)
                 commit_and_push
                 echo ""
                 print_success "Configuration complete!"
@@ -1453,7 +1465,7 @@ main_menu() {
                 show_usage_info
                 break
                 ;;
-            4)
+            6)
                 print_info "Exiting without saving changes"
                 exit 0
                 ;;
