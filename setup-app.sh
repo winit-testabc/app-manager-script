@@ -820,8 +820,60 @@ EOF
 
 # Commit and push changes
 commit_and_push() {
-    if [ "$CHANGES_MADE" = false ]; then
-        print_info "No changes to commit"
+    cd k8s-production
+    
+    # Always check for changes, regardless of CHANGES_MADE flag
+    # Add all modified files
+    FILES_TO_ADD=()
+    
+    # Add app directory if it exists and has changes
+    if [ -d "apps/${APP_NAME}" ]; then
+        if git diff --quiet "apps/${APP_NAME}" 2>/dev/null && [ -z "$(git ls-files --others --exclude-standard "apps/${APP_NAME}")" ]; then
+            # No changes in app directory
+            :
+        else
+            FILES_TO_ADD+=("apps/${APP_NAME}/")
+        fi
+    fi
+    
+    # Add ingress file if it exists and has changes
+    if [ -f "apps/tunnel-ingress/tunnel-ingress.yaml" ]; then
+        if git diff --quiet "apps/tunnel-ingress/tunnel-ingress.yaml" 2>/dev/null; then
+            # No changes in ingress file
+            :
+        else
+            FILES_TO_ADD+=("apps/tunnel-ingress/tunnel-ingress.yaml")
+        fi
+    fi
+    
+    # Check if there are any changes to commit
+    if [ ${#FILES_TO_ADD[@]} -eq 0 ]; then
+        # Check if there are any unstaged changes at all
+        if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+            print_info "No changes to commit"
+            cd ..
+            # Still offer to create app repo if it's a new app
+            if [ "$APP_EXISTS" = false ]; then
+                create_app_repo
+            fi
+            return 0
+        fi
+    fi
+    
+    # Add files
+    print_info "Staging changes..."
+    for file in "${FILES_TO_ADD[@]}"; do
+        git add "$file"
+        print_info "  Added: $file"
+    done
+    
+    # Also add any other modified files
+    git add -u 2>/dev/null || true
+    
+    # Check if there's anything to commit
+    if git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+        print_warning "No changes staged for commit"
+        cd ..
         # Still offer to create app repo if it's a new app
         if [ "$APP_EXISTS" = false ]; then
             create_app_repo
@@ -829,44 +881,30 @@ commit_and_push() {
         return 0
     fi
     
-    cd k8s-production
-    
-    # Check if there are changes
-    if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-        print_info "Committing changes..."
-        
-        git add "${APP_NAME}/" 2>/dev/null || true
-        git add "apps/tunnel-ingress/tunnel-ingress.yaml" 2>/dev/null || true
-        
-        COMMIT_MSG="Configure ${APP_NAME} app"
-        if [ "$APP_EXISTS" = true ]; then
-            COMMIT_MSG="Update ${APP_NAME} app configuration"
-        fi
-        
-        git commit -m "$COMMIT_MSG" || {
-            print_warning "Nothing to commit (no changes detected)"
-            cd ..
-            # Still offer to create app repo if it's a new app
-            if [ "$APP_EXISTS" = false ]; then
-                create_app_repo
-            fi
-            return 0
-        }
-        
-        print_info "Pushing to GitHub..."
-        git push origin main 2>/dev/null || git push origin master 2>/dev/null || {
-            print_error "Failed to push changes"
-            print_info "You can push manually:"
-            echo "  cd k8s-production"
-            echo "  git push origin main"
-            cd ..
-            return 1
-        }
-        
-        print_success "Changes pushed to GitHub"
-    else
-        print_info "No changes detected"
+    # Commit changes
+    COMMIT_MSG="Configure ${APP_NAME} app"
+    if [ "$APP_EXISTS" = true ]; then
+        COMMIT_MSG="Update ${APP_NAME} app configuration"
     fi
+    
+    print_info "Committing changes..."
+    git commit -m "$COMMIT_MSG" || {
+        print_error "Failed to commit changes"
+        cd ..
+        return 1
+    }
+    
+    print_info "Pushing to GitHub..."
+    git push origin main 2>/dev/null || git push origin master 2>/dev/null || {
+        print_error "Failed to push changes"
+        print_info "You can push manually:"
+        echo "  cd k8s-production"
+        echo "  git push origin main"
+        cd ..
+        return 1
+    }
+    
+    print_success "Changes committed and pushed to GitHub"
     
     cd ..
     
