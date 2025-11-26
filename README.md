@@ -40,10 +40,7 @@ Since the repository is private, use GitHub CLI which handles authentication aut
 # One-time: Authenticate (if not already done)
 gh auth login
 
-# Download and run (using installer script)
-curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/install.sh | bash -s -- [app-name]
-
-# OR clone and run:
+# Clone and run (recommended):
 gh repo clone winit-testabc/app-manager-script
 cd app-manager-script
 ./setup-app.sh [app-name]
