@@ -8,7 +8,18 @@ Interactive script to configure new apps or edit existing ones. This script help
 
 ## Quick Start
 
-**Recommended: Download and run (most reliable):**
+**Recommended: Use wrapper script (downloads and runs automatically):**
+```bash
+# Linux/macOS/Git Bash - One-liner that works reliably
+curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/run.sh | bash
+
+# Or download wrapper and run
+curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/run.sh -o run.sh
+chmod +x run.sh
+./run.sh
+```
+
+**Alternative: Download script manually:**
 ```bash
 # Download the script
 curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh -o setup-app.sh
@@ -20,7 +31,7 @@ chmod +x setup-app.sh
 ./setup-app.sh
 ```
 
-**Alternative: Run directly (may not work in all environments):**
+**Direct pipe (may not work in all environments):**
 ```bash
 # Linux/macOS/Git Bash
 curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh | bash
@@ -29,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/ma
 irm https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh | bash
 ```
 
-**Note:** If piping doesn't work (script exits immediately), download the script first as shown above.
+**Note:** If piping directly doesn't work (script exits immediately), use the wrapper script or download method above.
 
 **Prerequisites:** GitHub CLI (`gh`) must be installed and authenticated. See [Prerequisites](#prerequisites) below.
 
