@@ -702,7 +702,7 @@ ${INGRESS_LIST}
 \`\`\`bash
 # Deploy using script
 cd ../WinIT-DO
-./scripts/deploy-app.sh ${APP_NAME} v1.0.0-${ENVIRONMENT} ${GITHUB_ORG}/${APP_NAME}-main
+./scripts/deploy-app.sh ${APP_NAME} v1.0.0-${ENVIRONMENT} ${GITHUB_ORG}/${APP_NAME}
 \`\`\`
 EOF
     
