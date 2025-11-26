@@ -4,7 +4,20 @@ Interactive script to configure new apps or edit existing ones. This script help
 
 ## Repository
 
-**GitHub**: https://github.com/winit-testabc/app-manager-script
+**GitHub**: https://github.com/winit-testabc/app-manager-script (Public)
+
+## Quick Start
+
+**Run directly (one-liner):**
+```bash
+# Linux/macOS/Git Bash
+curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh | bash -s -- [app-name]
+
+# Windows PowerShell
+irm https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh | bash -s -- [app-name]
+```
+
+**Prerequisites:** GitHub CLI (`gh`) must be installed and authenticated. See [Prerequisites](#prerequisites) below.
 
 ## Features
 
