@@ -918,6 +918,17 @@ main() {
     echo "============================================================================"
     echo ""
     
+    # Check if we can read from terminal (for interactive input)
+    if [ ! -t 0 ] && [ ! -r /dev/tty ]; then
+        print_error "Cannot read from terminal. This script requires interactive input."
+        echo ""
+        echo "Please download and run the script instead of piping:"
+        echo "  curl -fsSL https://raw.githubusercontent.com/winit-testabc/app-manager-script/main/setup-app.sh -o setup-app.sh"
+        echo "  chmod +x setup-app.sh"
+        echo "  ./setup-app.sh"
+        exit 1
+    fi
+    
     # Check prerequisites
     check_gh_cli
     
