@@ -1324,11 +1324,10 @@ prompt_version() {
     TAG="v\${VERSION}-\${ENV_SUFFIX}"
 }
 
-# Monitor deployment workflow
-monitor_deployment() {
+# Monitor deployment workflow by run ID
+monitor_deployment_by_id() {
+    local run_id="\$1"
     local env_suffix="\${ENV_SUFFIX}"
-    local app_name="${APP_NAME}"
-    local tag="\${TAG}"
     
     # Determine k8s repo based on environment
     if [ "\$env_suffix" = "staging" ]; then
@@ -1337,41 +1336,14 @@ monitor_deployment() {
         local k8s_repo="\${GITHUB_ORG}/k8s-production"
     fi
     
-    local workflow_file="deploy-from-tag.yml"
-    
-    print_info "Monitoring deployment workflow..."
-    print_info "Repository: \$k8s_repo"
-    print_info "Workflow: \$workflow_file"
-    print_info "Tag: \$tag"
-    echo ""
-    
-    # Wait a moment for the workflow to start
-    sleep 4
-    
-    # Find the workflow run that matches our tag and service name
-    # Look for runs with matching inputs (service_name and tag)
-    local run_id=\$(gh run list --repo "\$k8s_repo" --workflow "\$workflow_file" --limit 10 --json databaseId,createdAt,inputs --jq \\
-        ".[] | select(.inputs.service_name == \"\${app_name}\" and .inputs.tag == \"\${tag}\") | .databaseId" 2>/dev/null | \\
-        head -1)
-    
-    # If not found by inputs, try to find the most recent run (fallback)
-    if [ -z "\$run_id" ] || [ "\$run_id" = "null" ]; then
-        print_warning "Could not find workflow run matching tag \$tag. Trying most recent run..."
-        run_id=\$(gh run list --repo "\$k8s_repo" --workflow "\$workflow_file" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
-    fi
-    
-    if [ -z "\$run_id" ] || [ "\$run_id" = "null" ]; then
-        print_warning "Could not find workflow run. You can monitor manually:"
-        echo "  gh run list --repo \$k8s_repo --workflow \$workflow_file"
-        echo ""
-        echo "Or view actions at:"
-        echo "  https://github.com/\$k8s_repo/actions"
+    if [ -z "\$run_id" ]; then
+        print_warning "No run ID provided for monitoring"
         return 0
     fi
     
     local run_url="https://github.com/\$k8s_repo/actions/runs/\$run_id"
+    print_info "Monitoring workflow run #\${run_id}"
     print_info "Workflow run URL: \$run_url"
-    print_info "Watching workflow run #\${run_id}"
     echo ""
     
     # Watch the workflow run
