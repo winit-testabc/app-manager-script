@@ -483,11 +483,11 @@ EOF
     
     # Insert route before the --- separator after the target section
     TEMP_FILE=$(mktemp)
-    awk -v domain="$DOMAIN" -v app="$APP_NAME" -v port="$PORT" -v namespace="$NAMESPACE" -v section_header="$SECTION_HEADER" '
+    awk -v domain="$DOMAIN" -v app="$APP_NAME" -v port="$PORT" -v ns="$NAMESPACE" -v section_header="$SECTION_HEADER" '
         BEGIN { in_target_section = 0; inserted = 0 }
         index($0, section_header) > 0 { in_target_section = 1 }
         /^---$/ && in_target_section && !inserted {
-            print "    # " app ": " domain " -> " app "." namespace ":" port
+            print "    # " app ": " domain " -> " app "." ns ":" port
             print "    - host: " domain
             print "      http:"
             print "        paths:"
