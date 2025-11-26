@@ -1297,6 +1297,83 @@ DEPLOY_EOF
     print_success "Created deploy script: ${deploy_script_path}"
 }
 
+# Show current configuration in table format
+show_current_config() {
+    echo ""
+    echo "============================================================================="
+    echo "📊 Current Configuration for: $APP_NAME"
+    echo "============================================================================="
+    echo ""
+    
+    # Check if app exists
+    MANIFEST_FILE="${K8S_DIR}/${APP_NAME}/${APP_NAME}.yaml"
+    if [ ! -f "$MANIFEST_FILE" ]; then
+        print_warning "App manifest not found. This is a new app."
+        echo ""
+        echo "┌─────────────────────────────────────────────────────────────────┐"
+        echo "│ Status: Not configured yet                                       │"
+        echo "└─────────────────────────────────────────────────────────────────┘"
+        return
+    fi
+    
+    # Extract values if not already extracted
+    if [ -z "$REPLICAS" ]; then
+        extract_current_values
+    fi
+    
+    # Check if source repo exists
+    SOURCE_REPO="${GITHUB_ORG}/${APP_NAME}"
+    REPO_EXISTS=false
+    if gh repo view "$SOURCE_REPO" &> /dev/null; then
+        REPO_EXISTS=true
+    fi
+    
+    # Get ingress routes
+    list_ingress_routes
+    
+    # Print table
+    printf "┌─────────────────────────────────────────────────────────────────┐\n"
+    printf "│ %-63s │\n" "Configuration"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    printf "│ %-25s │ %-36s │\n" "App Name" "$APP_NAME"
+    printf "│ %-25s │ %-36s │\n" "Environment" "${ENVIRONMENT:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "Namespace" "${NAMESPACE:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "Replicas" "${REPLICAS:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "Container Port" "${CONTAINER_PORT:-Not set}"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    printf "│ %-63s │\n" "Resources"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    printf "│ %-25s │ %-36s │\n" "Memory Request" "${MEMORY_REQUEST:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "Memory Limit" "${MEMORY_LIMIT:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "CPU Request" "${CPU_REQUEST:-Not set}"
+    printf "│ %-25s │ %-36s │\n" "CPU Limit" "${CPU_LIMIT:-Not set}"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    printf "│ %-63s │\n" "Repository"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    if [ "$REPO_EXISTS" = true ]; then
+        printf "│ %-25s │ %-36s │\n" "Source Repo" "✅ $SOURCE_REPO"
+    else
+        printf "│ %-25s │ %-36s │\n" "Source Repo" "❌ Not created"
+    fi
+    printf "│ %-25s │ %-36s │\n" "K8s Repo" "$K8S_REPO"
+    printf "│ %-25s │ %-36s │\n" "Manifest Path" "apps/${APP_NAME}/${APP_NAME}.yaml"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    printf "│ %-63s │\n" "Ingress Routes"
+    printf "├─────────────────────────────────────────────────────────────────┤\n"
+    if [ ${#INGRESS_ROUTES[@]} -eq 0 ]; then
+        printf "│ %-63s │\n" "No ingress routes configured"
+    else
+        for route in "${INGRESS_ROUTES[@]}"; do
+            DOMAIN="${route%%:*}"
+            PORT="${route##*:}"
+            printf "│ %-25s │ %-36s │\n" "Domain" "$DOMAIN"
+            printf "│ %-25s │ %-36s │\n" "  → Port" "$APP_NAME:$PORT"
+        done
+    fi
+    printf "└─────────────────────────────────────────────────────────────────┘\n"
+    echo ""
+}
+
 # Show usage information
 show_usage_info() {
     echo ""
@@ -1347,8 +1424,10 @@ main_menu() {
         echo ""
         print_menu "1. Configure app settings (replicas, resources, port)"
         print_menu "2. Manage ingress routes"
-        print_menu "3. Save and push changes to GitHub"
-        print_menu "4. Exit without saving"
+        print_menu "3. View current configuration"
+        print_menu "4. Get deploy script"
+        print_menu "5. Save and push changes to GitHub"
+        print_menu "6. Exit without saving"
         echo ""
         print_question "Choose an option:"
         read_input MENU_CHOICE
