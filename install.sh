@@ -31,20 +31,21 @@ if command -v gh &> /dev/null && gh auth status &> /dev/null; then
     TEMP_DIR=$(mktemp -d)
     cd "$TEMP_DIR"
     
-    # Clone just the script file
-    gh repo clone "$REPO" -- --depth=1 --filter=blob:none --sparse 2>/dev/null || {
-        # Fallback: clone full repo
-        gh repo clone "$REPO" -- --depth=1
-    }
-    
-    cd app-manager-script
-    
-    if [ -f "setup-app.sh" ]; then
-        chmod +x setup-app.sh
-        print_success "Script downloaded successfully"
-        exec ./setup-app.sh "$@"
+    # Clone the repo (gh handles authentication automatically)
+    if gh repo clone "$REPO" -- --depth=1 2>/dev/null; then
+        cd app-manager-script
+        
+        if [ -f "setup-app.sh" ]; then
+            chmod +x setup-app.sh
+            print_success "Script downloaded successfully"
+            exec ./setup-app.sh "$@"
+        else
+            print_error "Script not found"
+            exit 1
+        fi
     else
-        print_error "Script not found"
+        print_error "Failed to clone repository"
+        print_info "Make sure you have access to the repository"
         exit 1
     fi
     
