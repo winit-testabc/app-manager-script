@@ -34,12 +34,9 @@ read_input() {
     if [ -t 0 ]; then
         # stdin is a terminal, read normally
         read -r "$@"
-    elif [ -c /dev/tty ]; then
-        # stdin is piped, but /dev/tty is available
-        read -r "$@" < /dev/tty
     else
-        # Fallback: try /dev/tty anyway
-        read -r "$@" < /dev/tty 2>/dev/null || read -r "$@"
+        # stdin is piped, read from /dev/tty
+        read -r "$@" < /dev/tty
     fi
 }
 
