@@ -1446,15 +1446,35 @@ main() {
     print_info "Running deployment script..."
     echo ""
     
-    # Execute deploy script in background and capture output
-    bash "\$DEPLOY_SCRIPT" "${APP_NAME}" "\${TAG}" "${SOURCE_REPO}" &
-    local deploy_pid=\$!
+    # Execute deploy script and capture output to extract run ID
+    local deploy_output=\$(bash "\$DEPLOY_SCRIPT" "${APP_NAME}" "\${TAG}" "${SOURCE_REPO}" 2>&1)
+    local deploy_exit=\$?
     
-    # Wait a moment for the workflow to be triggered
-    sleep 3
+    # Extract workflow run ID from output (look for "actions/runs/" URL)
+    local run_id=\$(echo "\$deploy_output" | grep -oE "actions/runs/[0-9]+" | head -1 | sed 's|actions/runs/||')
     
-    # Monitor the deployment
-    monitor_deployment
+    # Also try to extract from "Workflow run:" line
+    if [ -z "\$run_id" ]; then
+        run_id=\$(echo "\$deploy_output" | grep -oE "runs/[0-9]+" | head -1 | sed 's|runs/||')
+    fi
+    
+    # If deploy script failed, exit
+    if [ \$deploy_exit -ne 0 ]; then
+        echo "\$deploy_output"
+        exit \$deploy_exit
+    fi
+    
+    echo "\$deploy_output"
+    echo ""
+    
+    # Monitor the deployment if we found a run ID
+    if [ -n "\$run_id" ]; then
+        monitor_deployment_by_id "\$run_id"
+    else
+        print_warning "Could not extract workflow run ID from output"
+        print_info "You can monitor manually:"
+        echo "  gh run list --repo \${GITHUB_ORG}/k8s-production --workflow=deploy-from-tag.yml"
+    fi
 }
 
 main "\$@"
