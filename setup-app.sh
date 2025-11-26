@@ -1236,15 +1236,18 @@ get_latest_version() {
     
     # Get all tags matching the pattern v*.*.*-{app_name}-{env}
     # Format: v1.0.0-test3-prod or v1.0.0-test3-staging
-    local latest_tag=\$(gh api repos/\${k8s_repo}/git/refs/tags --jq '.[].ref' 2>/dev/null | \\
+    # Use gh api to get tags and filter properly
+    local latest_version=\$(gh api repos/\${k8s_repo}/git/refs/tags --jq ".[].ref" 2>/dev/null | \\
         grep -E "refs/tags/v[0-9]+\\.[0-9]+\\.[0-9]+-\${app_name}-\${env_suffix}\$" | \\
-        sed "s|refs/tags/v||" | sed "s/-\${app_name}-\${env_suffix}\$//" | \\
-        sort -V | tail -1)
+        sed "s|refs/tags/v||" | \\
+        sed "s/-\${app_name}-\${env_suffix}\$//" | \\
+        sort -V -t. -k1,1n -k2,2n -k3,3n | \\
+        tail -1)
     
-    if [ -z "\$latest_tag" ]; then
+    if [ -z "\$latest_version" ] || [ "\$latest_version" = "" ]; then
         echo "1.0.0"
     else
-        echo "\$latest_tag"
+        echo "\$latest_version"
     fi
 }
 
@@ -1325,6 +1328,7 @@ prompt_version() {
 monitor_deployment() {
     local env_suffix="\${ENV_SUFFIX}"
     local app_name="${APP_NAME}"
+    local tag="\${TAG}"
     
     # Determine k8s repo based on environment
     if [ "\$env_suffix" = "staging" ]; then
@@ -1338,13 +1342,23 @@ monitor_deployment() {
     print_info "Monitoring deployment workflow..."
     print_info "Repository: \$k8s_repo"
     print_info "Workflow: \$workflow_file"
+    print_info "Tag: \$tag"
     echo ""
     
     # Wait a moment for the workflow to start
-    sleep 3
+    sleep 4
     
-    # Get the latest workflow run (most recent one)
-    local run_id=\$(gh run list --repo "\$k8s_repo" --workflow "\$workflow_file" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
+    # Find the workflow run that matches our tag and service name
+    # Look for runs with matching inputs (service_name and tag)
+    local run_id=\$(gh run list --repo "\$k8s_repo" --workflow "\$workflow_file" --limit 10 --json databaseId,createdAt,inputs --jq \\
+        ".[] | select(.inputs.service_name == \"\${app_name}\" and .inputs.tag == \"\${tag}\") | .databaseId" 2>/dev/null | \\
+        head -1)
+    
+    # If not found by inputs, try to find the most recent run (fallback)
+    if [ -z "\$run_id" ] || [ "\$run_id" = "null" ]; then
+        print_warning "Could not find workflow run matching tag \$tag. Trying most recent run..."
+        run_id=\$(gh run list --repo "\$k8s_repo" --workflow "\$workflow_file" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
+    fi
     
     if [ -z "\$run_id" ] || [ "\$run_id" = "null" ]; then
         print_warning "Could not find workflow run. You can monitor manually:"
