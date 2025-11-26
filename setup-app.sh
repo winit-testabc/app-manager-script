@@ -57,15 +57,16 @@ read_input() {
 
 # Configuration
 GITHUB_ORG="winit-testabc"
-K8S_REPO="${GITHUB_ORG}/k8s-production"
-K8S_DIR="k8s-production/apps"
-INGRESS_FILE="k8s-production/apps/tunnel-ingress/tunnel-ingress.yaml"
 ECR_REGISTRY="418295680544.dkr.ecr.us-east-1.amazonaws.com/winitxyz"
 
 # Global variables
 APP_NAME=""
-ENVIRONMENT="production"
-NAMESPACE="production"
+ENVIRONMENT=""
+NAMESPACE=""
+K8S_REPO=""
+K8S_DIR=""
+INGRESS_FILE=""
+K8S_TEMP_DIR=""
 MANIFEST_FILE=""
 APP_EXISTS=false
 CHANGES_MADE=false
@@ -94,35 +95,49 @@ check_gh_cli() {
     fi
 }
 
-# Clone k8s-production repository if it doesn't exist
-setup_k8s_repo() {
-    WORK_DIR="$(pwd)"
-    
-    if [ -d "k8s-production" ]; then
-        print_info "k8s-production directory exists locally"
-        print_info "Updating from remote..."
-        cd k8s-production
-        git fetch origin
-        git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
-        cd "$WORK_DIR"
-        return 0
+# Set k8s repo based on environment
+set_k8s_repo() {
+    if [ "$ENVIRONMENT" = "staging" ]; then
+        K8S_REPO="${GITHUB_ORG}/k8s-staging"
+        K8S_DIR_NAME="k8s-staging"
+    else
+        K8S_REPO="${GITHUB_ORG}/k8s-production"
+        K8S_DIR_NAME="k8s-production"
     fi
     
-    print_info "k8s-production not found locally. Cloning..."
+    # Create temp directory for k8s repo
+    K8S_TEMP_DIR=$(mktemp -d)
+    K8S_DIR="${K8S_TEMP_DIR}/${K8S_DIR_NAME}/apps"
+    INGRESS_FILE="${K8S_TEMP_DIR}/${K8S_DIR_NAME}/apps/tunnel-ingress/tunnel-ingress.yaml"
+}
+
+# Clone k8s repository to temp directory
+setup_k8s_repo() {
+    print_info "Cloning ${K8S_DIR_NAME} repository to temporary directory..."
     
     if gh repo view "$K8S_REPO" &> /dev/null; then
-        if gh repo clone "$K8S_REPO" 2>&1; then
-            print_success "Cloned k8s-production repository"
+        if gh repo clone "$K8S_REPO" "$K8S_TEMP_DIR/${K8S_DIR_NAME}" 2>&1; then
+            print_success "Cloned ${K8S_DIR_NAME} repository"
         else
-            print_error "Failed to clone k8s-production repository"
+            print_error "Failed to clone ${K8S_DIR_NAME} repository"
             echo ""
             echo "You can clone it manually:"
             echo "  gh repo clone $K8S_REPO"
+            rm -rf "$K8S_TEMP_DIR"
             exit 1
         fi
     else
         print_error "Repository $K8S_REPO not found or not accessible"
+        rm -rf "$K8S_TEMP_DIR"
         exit 1
+    fi
+}
+
+# Cleanup temp directory
+cleanup_k8s_repo() {
+    if [ -n "$K8S_TEMP_DIR" ] && [ -d "$K8S_TEMP_DIR" ]; then
+        print_info "Cleaning up temporary directory..."
+        rm -rf "$K8S_TEMP_DIR"
     fi
 }
 
@@ -758,7 +773,7 @@ Source code for ${APP_NAME} application.
 
 ## Deployment
 
-This app is deployed via ArgoCD from the k8s-production repository.
+This app is deployed via ArgoCD from the ${K8S_DIR_NAME} repository.
 
 ## Local Development
 
@@ -772,7 +787,7 @@ npm start    # or python app.py, etc.
 
 ## Build & Deploy
 
-See k8s-production repository for deployment configuration.
+See ${K8S_DIR_NAME} repository for deployment configuration.
 EOF
         
         # Create .gitignore
@@ -808,14 +823,14 @@ EOF
 # Deploy Script for ${APP_NAME}
 # ============================================================================
 # This script helps you deploy ${APP_NAME} by prompting for version and environment.
-# It calls the deployment workflow in the k8s-production repository.
+# It calls the deployment workflow in the k8s repository.
 #
 # Usage:
 #   ./deploy.sh
 #
 # Requirements:
 #   - GitHub CLI (gh) installed and authenticated
-#   - Access to winit-testabc/k8s-production repository
+#   - Access to the k8s repository
 # ============================================================================
 
 set -e
@@ -992,7 +1007,7 @@ DEPLOY_EOF
 
 # Commit and push changes
 commit_and_push() {
-    cd k8s-production
+    cd "${K8S_TEMP_DIR}/${K8S_DIR_NAME}"
     
     # Always check for changes, regardless of CHANGES_MADE flag
     # Add all modified files
@@ -1035,11 +1050,12 @@ commit_and_push() {
         # Check if there are any unstaged changes at all
         if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
             print_info "No changes to commit"
-            cd ..
+            cd - > /dev/null
             # Still offer to create app repo if it's a new app
             if [ "$APP_EXISTS" = false ]; then
                 create_app_repo
             fi
+            cleanup_k8s_repo
             return 0
         fi
     fi
@@ -1060,11 +1076,12 @@ commit_and_push() {
     # Check if there's anything to commit
     if git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
         print_warning "No changes staged for commit"
-        cd ..
+        cd - > /dev/null
         # Still offer to create app repo if it's a new app
         if [ "$APP_EXISTS" = false ]; then
             create_app_repo
         fi
+        cleanup_k8s_repo
         return 0
     fi
     
@@ -1077,7 +1094,8 @@ commit_and_push() {
     print_info "Committing changes..."
     git commit -m "$COMMIT_MSG" || {
         print_error "Failed to commit changes"
-        cd ..
+        cd - > /dev/null
+        cleanup_k8s_repo
         return 1
     }
     
@@ -1085,15 +1103,19 @@ commit_and_push() {
     git push origin main 2>/dev/null || git push origin master 2>/dev/null || {
         print_error "Failed to push changes"
         print_info "You can push manually:"
-        echo "  cd k8s-production"
+        echo "  cd ${K8S_TEMP_DIR}/${K8S_DIR_NAME}"
         echo "  git push origin main"
-        cd ..
+        cd - > /dev/null
+        cleanup_k8s_repo
         return 1
     }
     
     print_success "Changes committed and pushed to GitHub"
     
-    cd ..
+    cd - > /dev/null
+    
+    # Cleanup temp directory
+    cleanup_k8s_repo
     
     # Create app source repository if it's a new app
     if [ "$APP_EXISTS" = false ]; then
@@ -1130,10 +1152,10 @@ show_usage_info() {
     echo "   ./scripts/deploy-app.sh ${APP_NAME} v1.0.0-production ${GITHUB_ORG}/${APP_NAME}"
     echo ""
     echo "📝 Kubernetes Manifests:"
-    echo "   https://github.com/${GITHUB_ORG}/k8s-production/tree/main/apps/${APP_NAME}"
+    echo "   https://github.com/${K8S_REPO}/tree/main/apps/${APP_NAME}"
     echo ""
     echo "🔍 Monitor deployment:"
-    echo "   gh run list --repo ${GITHUB_ORG}/k8s-production --workflow=deploy-from-tag.yml"
+    echo "   gh run list --repo ${K8S_REPO} --workflow=deploy-from-tag.yml"
     echo ""
     echo "============================================================================="
 }
@@ -1212,13 +1234,20 @@ main() {
     # Check prerequisites
     check_gh_cli
     
-    # Setup k8s-production repository
-    setup_k8s_repo
-    
-    # Get app name
+    # Get app name first
     prompt_app_name
     
-    # Show main menu
+    # Prompt for environment (needed to determine which k8s repo to use)
+    prompt_environment
+    
+    # Set k8s repo based on environment
+    set_k8s_repo
+    
+    # Setup k8s repository
+    setup_k8s_repo
+    
+    # Check if app exists and show main menu
+    check_app_exists
     main_menu
 }
 
