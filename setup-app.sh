@@ -1206,7 +1206,7 @@ read_input() {
 prompt_environment() {
     while true; do
         print_question "Select environment (production/staging) [default: production]: "
-        read_input "Select environment (production/staging) [default: production]: " ENV "production"
+        read_input "Select environment (production/staging) [default: production]: " ENV_INPUT "production"
         
         ENV=\$(echo "\$ENV_INPUT" | tr '[:upper:]' '[:lower:]')
         
