@@ -828,10 +828,27 @@ commit_and_push() {
     
     # Add app directory if it exists and has changes
     if [ -d "apps/${APP_NAME}" ]; then
-        if git diff --quiet "apps/${APP_NAME}" 2>/dev/null && [ -z "$(git ls-files --others --exclude-standard "apps/${APP_NAME}")" ]; then
-            # No changes in app directory
-            :
-        else
+        # Check if any files in the directory have changed or are new
+        HAS_CHANGES=false
+        
+        # Check for modified tracked files
+        if ! git diff --quiet "apps/${APP_NAME}" 2>/dev/null; then
+            HAS_CHANGES=true
+        fi
+        
+        # Check for untracked files
+        if [ -n "$(git ls-files --others --exclude-standard "apps/${APP_NAME}")" ]; then
+            HAS_CHANGES=true
+        fi
+        
+        # Check if the YAML file exists and is modified
+        if [ -f "apps/${APP_NAME}/${APP_NAME}.yaml" ]; then
+            if ! git diff --quiet "apps/${APP_NAME}/${APP_NAME}.yaml" 2>/dev/null || [ -z "$(git ls-files "apps/${APP_NAME}/${APP_NAME}.yaml" 2>/dev/null)" ]; then
+                HAS_CHANGES=true
+            fi
+        fi
+        
+        if [ "$HAS_CHANGES" = true ]; then
             FILES_TO_ADD+=("apps/${APP_NAME}/")
         fi
     fi
